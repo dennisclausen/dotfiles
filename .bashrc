@@ -152,3 +152,6 @@ for file in ~/.{bash_prompt,aliases,functions,path,dockerfunc,extra,exports,auto
 	fi
 done
 unset file
+
+# https://github.com/junegunn/fzf/issues/2542
+[ -f /usr/share/doc/fzf/examples/key-bindings.bash ] && source /usr/share/doc/fzf/examples/key-bindings.bash
