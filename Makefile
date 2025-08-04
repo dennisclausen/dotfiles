@@ -2,7 +2,7 @@ SHELL := bash
 
 .PHONY: all
 all: dotfiles 
-	sudo apt install python3-pip python3-argcomplete shellcheck
+	sudo apt install python3-pip python3-argcomplete shellcheck eza
 
 .PHONY: dotfiles
 dotfiles: ## Installs the dotfiles.
