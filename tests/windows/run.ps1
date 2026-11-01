@@ -61,6 +61,8 @@ try {
         [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $repo $source), [ref]$tokens, [ref]$errors)
         Assert (-not $errors.Count) "PowerShell syntax: $source : $errors"
     }
+    $testRevision = (Get-FileHash -LiteralPath $PSCommandPath).Hash.Substring(0, 12)
+    Write-Output "dotfiles tests: source=$testRevision; PowerShell=$($PSVersionTable.PSVersion); Windows=$IsWindows"
     Write-Output 'PASS: PowerShell syntax for every declared source'
     $linuxManifest = [IO.File]::ReadAllText((Join-Path $repo 'install-manifest.sh'))
     Assert ($linuxManifest -notmatch 'powershell|scripts/windows') 'Linux installer gained Windows files'
@@ -240,7 +242,9 @@ try {
     Write-Output 'PASS: real HOME/private directory metadata unchanged'
     Write-Output "PASS: PowerShell regression suite ($($PSVersionTable.PSVersion), Windows=$IsWindows)"
 } catch {
-    Write-Error $_ -ErrorAction Continue
+    # Emit the complete multiline message without PowerShell error-view formatting
+    # or turning a child-script error into a new error at make.ps1's call site.
+    [Console]::Error.WriteLine("FAIL: $($_.Exception.Message)")
     exit 1
 } finally {
     foreach ($name in $environmentNames) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }

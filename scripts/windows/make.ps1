@@ -47,4 +47,4 @@ try {
         default { throw "This checkout has no supported $Target installation manifest; no system files were changed." }
     }
     exit 0
-} catch { Write-Error $_ -ErrorAction Continue; exit 1 }
+} catch { [Console]::Error.WriteLine("dotfiles: $($_.Exception.Message)"); exit 1 }

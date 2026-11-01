@@ -128,4 +128,8 @@ full metadata assertion while reporting the installer exit/output and exact
 before/after differences. The failure's cause is not established from the old
 generic error. Linux and PowerShell-on-Linux checks pass; a Windows rerun is
 required to confirm whether stale metadata was responsible or diagnose a
-remaining installer failure. No installer safety check was relaxed.
+remaining installer failure. A follow-up adds a test-source fingerprint and
+writes multiline failures directly to stderr to avoid nested PowerShell error
+formatting. A deliberate snapshot failure was exercised through GNU Make locally
+to verify diagnostic preservation and nonzero exit propagation. No installer
+safety check was relaxed.

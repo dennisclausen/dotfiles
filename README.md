@@ -259,6 +259,12 @@ pwsh -NoLogo -NoProfile -NonInteractive -File ./tests/windows/run.ps1
 make shellcheck
 ```
 
+The suite prints a test-source fingerprint and its PowerShell version before
+running installation checks. If `make test` fails, include the complete output
+and `git log -1 --oneline` in the report. Run the direct `pwsh -File` command above
+to bypass Make; failure messages include the installer exit code, its output and
+changed snapshot entries, printed directly to stderr.
+
 Tests need PowerShell 7.4+, Git and GNU Make. Neovim syntax checking is performed
 when nvim exists (otherwise explicitly skipped). No Pester dependency exists.
 They parse every declared PowerShell source, use explicit temporary homes,
