@@ -1,8 +1,12 @@
 # dotfiles
 
-Personal Bash, Git, Readline and Neovim configuration for Linux. The installer
-and tests assume Bash 4+, GNU coreutils and GNU Make. Some retained helpers are
-platform-specific; this is not a portable macOS installer.
+Personal Bash, Git, Readline and Neovim configuration for Linux, plus native
+Windows 11 PowerShell 7 configuration. Shared Git/Neovim files stay in their
+existing locations; `powershell/` contains the Windows shell, and
+`scripts/windows/` contains native installation and maintenance scripts.
+Linux requires Bash 4+, GNU coreutils and GNU Make. Windows requires PowerShell
+7.4+, Git and native GNU Make; WSL and Git Bash are not required. macOS and Windows
+PowerShell 5.1 are not supported by the new installer.
 
 ## Branches
 
@@ -10,7 +14,267 @@ platform-specific; this is not a portable macOS installer.
 release branch; promote reviewed changes from `dev` to `main` when preparing a
 release.
 
-## Installation
+## Windows 11 quick start
+
+Review `gitconfig` (it contains the owner's identity),
+`scripts/windows/manifest.psd1`, and `powershell/` before installing. Keep the
+checkout at a stable path. These instructions assume the Windows support has
+been integrated into your copy of `dev`.
+
+Install PowerShell 7 and Git using Windows Package Manager (App Installer),
+then open **PowerShell 7**, not Windows PowerShell 5.1:
+
+```powershell
+winget install --exact --id Microsoft.PowerShell --source winget
+winget install --exact --id Git.Git --source winget
+```
+
+In the new PowerShell 7 terminal:
+
+```powershell
+git clone --branch dev https://github.com/dennisclausen/dotfiles.git
+Set-Location -LiteralPath ./dotfiles
+# Explicit, optional network/package operation: installs native GNU Make only.
+pwsh -NoProfile -File ./scripts/windows/bootstrap.ps1
+# Open another PowerShell 7 terminal, return to the checkout, then:
+make help
+make doctor
+make dotfiles
+```
+
+The default installation uses file symlinks. If Developer Mode or the necessary
+symlink permission is unavailable, installation stops before changing any
+configuration. Explicitly choose the copy alternative (no privilege required):
+
+```powershell
+$env:DOTFILES_INSTALL_MODE = 'Copy'
+make dotfiles
+```
+
+Keep that setting for later installs in this session; set it again in future
+sessions when using copy mode. Alternatively, bypass Make:
+
+```powershell
+pwsh -NoProfile -File ./scripts/windows/install.ps1 -Mode Copy
+```
+
+Open a fresh PowerShell 7 session after installation. `ll`, `..`, `g` and the
+other helpers are then available. `make` / `make all` install configuration only
+on Windows. They never run apt or install packages. Linux retains its existing
+default apt workflow.
+
+Bootstrap installs `ezwinports.make`, a native GNU Make 4.4.1 portable package,
+verified in [Microsoft's package manifest](https://github.com/microsoft/winget-pkgs/blob/master/manifests/e/ezwinports/make/4.4.1/ezwinports.make.installer.yaml).
+There is no requirement for Unix commands on PATH. Restart the terminal after
+package installation so WinGet's PATH changes are visible; use
+`Get-Command make, pwsh, git` to inspect resolution. `make.exe --version` should
+report GNU Make. This package is x86 and relies on Windows emulation on other
+architectures; native ARM64 execution has not been validated.
+
+If your execution policy blocks reviewed local scripts, inspect
+`Get-ExecutionPolicy -List` and apply your organization's normal policy. The
+repository does not bypass execution policy, enable Developer Mode, elevate,
+or change system settings.
+
+## Windows configuration and safety
+
+The Windows manifest is explicit; no hidden-file discovery occurs:
+
+| Resource | Windows destination |
+| --- | --- |
+| Minimal managed loader block | Runtime `$PROFILE.CurrentUserAllHosts` (PowerShell 7) |
+| Shared `gitconfig` | Included from a generated `<UserProfile>/.gitconfig` |
+| Shared `gitignore` | `<UserProfile>/.gitignore` (link or copy) |
+| The five existing `.config/nvim/` Lua files | `<LocalApplicationData>/nvim/` (individual links or copies) |
+
+UserProfile and LocalApplicationData come from .NET known folders, and the
+profile path comes from the running PowerShell 7 runtime. Redirected Documents
+is supported when its ancestors are real directories. Bash files, Readline,
+private directories and Git internals are never installed on Windows. Neovim
+uses its standard Windows path; custom `NVIM_APPNAME` or `XDG_CONFIG_HOME`
+layouts require manual placement.
+
+Existing profile text is retained, with a uniquely marked loader block appended;
+subsequent installs update that block only. Before any change, the original
+profile is renamed into a sibling `profile.ps1.dotfiles-backup.<guid>/original`.
+A symlink/reparse-point profile or malformed/duplicate markers stops preflight;
+integrate `powershell/profile.ps1` manually in that case. Existing host-specific
+profiles continue loading after CurrentUserAllHosts as PowerShell normally does.
+
+The loader imports the module once per session, retaining commands already defined
+by the user, and then sources the optional
+`dotfiles.local.ps1` beside CurrentUserAllHosts. Create that file for machine
+customizations; it is neither tracked nor installed. Restart the session after
+updating module code. Startup performs no network calls, tool installation,
+PATH modification, agent startup, or optional application execution. Native
+PowerShell commands and aliases keep their object/pipeline behavior.
+
+Git includes the shared configuration, overrides the excludes-file path for the
+target user, and finally includes `<UserProfile>/.gitconfig.local` if present.
+Use that untracked file for identity overrides or machine preferences. An old
+`.gitconfig` is backed up, rather than silently merged; review it and manually
+move desired settings to `.gitconfig.local`. Git for Windows handles shared
+Git shell aliases internally; the `dm` alias still requires `grep` and `xargs`,
+and binary `textconv` still requires `hexdump`. These commands are not provisioned
+or assumed available to PowerShell.
+
+Preflight validates every destination, parent, shared source and collision before
+changing configuration. File conflicts (including dangling file symlinks) are
+renamed to unique sibling `<name>.dotfiles-backup.<guid>/original` paths.
+Directory conflicts and reparse-point parents are rejected; directories are
+never replaced. OneDrive/cloud reparse ancestors and junctions can therefore
+require a different real directory or manual integration. Existing directory
+ACL inheritance applies to Windows backups; protect your own configuration
+folders accordingly.
+
+Correct links and byte-identical copies are left untouched. Copy mode copies
+only the manifest resources; Git and the profile still load code/configuration
+from the checkout. Mode changes are explicit and back up the previous file or
+link. Installation is sequential, not transactional: resolve any I/O failure
+and rerun. Do not run concurrent installs or modify destinations during a run.
+No automatic fallback, forced replacement, recursive directory replacement or
+privilege escalation occurs.
+
+### Windows updates, recovery and removal
+
+After updating the checkout with your normal Git workflow, rerun `make dotfiles`
+in the installation mode you selected. Links, the shared Git include and profile
+loader follow checkout updates; copy-mode Neovim/ignore files refresh only when
+you reinstall. Existing backups remain. Neovim plugins are not upgraded by the
+installer.
+
+To restore one resource, inspect both the installed path and the exact backup
+printed by installation. Preserve later edits first. For a symlink inspect
+`(Get-Item -LiteralPath $destination -Force).LinkTarget`; for a copy compare its
+contents with the manifest source. After confirming it is still your installed
+resource, restore using literal filesystem paths:
+
+```powershell
+# Substitute actual absolute paths from the installer output.
+$destination = 'C:/Users/you/.gitconfig'
+$backup = 'C:/Users/you/.gitconfig.dotfiles-backup.ACTUAL_GUID'
+# Stop unless the current destination is still the reviewed installed file.
+[IO.File]::Delete($destination)
+[IO.File]::Move((Join-Path $backup 'original'), $destination)
+[IO.Directory]::Delete($backup) # Fails if it is not empty; never recurse.
+```
+
+Repeat per resource as needed. For uninstallation, remove the marked loader
+block from CurrentUserAllHosts while retaining all your other profile text,
+then remove only the installed individual manifest files and generated Git
+include after inspection, restoring backups as desired. Keep `.gitconfig.local`,
+`dotfiles.local.ps1`, unrelated Neovim files, and backups. Never recursively
+remove the profile or Neovim directory. No automated uninstall deletes user data.
+
+## Shell compatibility matrix
+
+Linux commands remain unchanged. Windows functions accept PowerShell arguments;
+Bash expansions/flags are not parsed as shell source. All external tools remain
+available by their own command names.
+
+| Commands / configuration | Native Windows support |
+| --- | --- |
+| `..`, `...`, `....`, `.....`, `dl` | Literal-path navigation; `dl` uses `$HOME/Downloads` (custom redirected downloads can be set in the local profile) |
+| Bash `-` directory shortcut | Use PowerShell `Set-Location -` |
+| `mkd`, `tmpd` | Create and enter one directory; temporary names use GUIDs |
+| `ll` | Exactly `eza -la` plus supplied paths; native `Get-ChildItem -Force` objects if eza is absent |
+| `l`, `la`, `lsd` | eza listing, with native object fallbacks; path arguments, no Unix `ls` flags in the fallback |
+| `lsg`, `tree1`–`tree6`, `tre` | eza Git/tree flags; clear dependency error if unavailable; no pager |
+| `ls`, `cat`, `cp`, `mv`, `md`, `diff`, `h` | PowerShell built-ins retained; invoke eza/bat/Git explicitly when wanted |
+| `g`, `ga`, `subsub`, `gitsetoriginnopush` | Git wrappers forward arguments and native exit codes |
+| `gc` | PowerShell's existing Get-Content alias retained; no external `gitdate` implementation supplied; use `git commit` |
+| `rgi`, `grepr` | `rg -i`, preserving ripgrep's argument interface |
+| `fd`, `ffind` | Recursive native enumeration piped to fzf; `fd` enters selection, `ffind` returns it; no shell-string bat preview |
+| `fode` | Pipeline paths (or current files) → fzf multiple selection → `code`; cancellation performs no edit |
+| `croot` | New native Git-root navigation helper |
+| `repo` | Browser URL synthesis not ported; use Git remote commands / `croot` |
+| `cwd`, `o`, `v` | Native clipboard, Invoke-Item, Neovim (current directory if no argument) |
+| `week`, `lcmd`, `lastchanged` | ISO week, session history search, newest file objects; `lastchanged Path Count` |
+| `activate`, `p`, `ip3` | Windows venv `Scripts/Activate.ps1`, `python`, `ipython` |
+| `top` | Invokes independently installed `btop`, or the upstream Windows port `btop4win`; no monitor installed automatically |
+| `bat`, `rg`, `fzf`, Python, Git, Neovim | Use native applications directly |
+| `pubkey`, `prikey` | No SSH-reading or key-copying shortcut introduced |
+| `fkill`, `fzchmod`, `prune-branches`, `restart_gpgagent`, process/signal helpers | Not ported; use reviewed native commands; Unix signals/permissions are not Windows semantics |
+| `fapt`, `gpip`, `install-appimage`, systemd/X11/DBus helpers, `battery`, `hosts`, `flush`, IP/traceroute aliases | Linux/macOS assumptions retained only in Bash; no guessed Windows system mutation |
+| `calc`, `fs`, `targz`, `gz`, encoding/JSON/DNS/TLS/encryption, Go and formatter helpers, other Bash functions | Not exported by the Windows module; use the corresponding native tool or PowerShell/.NET directly |
+| Shared Git/Neovim configuration | Original preferences, plugins, LSPs, mappings and theme unchanged |
+
+## Windows tools and local verification
+
+Required: PowerShell 7.4+ (.NET 8 APIs) and Git; GNU Make for the Make entry points. Optional:
+Neovim, eza, ripgrep, fzf, bat and Python. The reviewed package IDs live in
+`scripts/windows/packages.psd1`, matched to
+[Microsoft's WinGet manifests](https://github.com/microsoft/winget-pkgs/tree/master/manifests).
+No second package manager is introduced. Install selected tools explicitly:
+
+```powershell
+# Offline report:
+make doctor
+# Explicit network/package operation; user-installable tools, or exact IDs:
+pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install
+pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install -Id eza-community.eza
+```
+
+The installer checks exact IDs with `winget show` before installing, requests
+user scope, skips applications already on PATH, and stops on the first failure.
+Neovim's [current WinGet manifest](https://github.com/microsoft/winget-pkgs/blob/master/manifests/n/Neovim/Neovim/0.12.6/Neovim.Neovim.installer.yaml)
+offers a machine-scope MSI only, so the script reports it as manual and continues
+with the other tools. For a user installation, download the Windows ZIP from
+[Neovim releases](https://github.com/neovim/neovim/releases), extract it to a
+folder you own, and add its `bin` directory to your user PATH through Windows
+settings. Choosing a Neovim version and installing/updating it is separate from
+the unchanged repository plugin configuration.
+It neither upgrades installed applications nor accepts agreements on your
+behalf. If the package lacks user-scope support, review its official installer
+and arrange installation yourself; the script does not retry with elevation.
+Python's Windows Store execution alias can appear as `python` even without a
+working Python installation; verify `python --version` and manage that alias
+through Windows settings if needed.
+
+btop is not provisioned automatically. Its upstream Windows port,
+[btop4win](https://github.com/aristocratos/btop4win), can be installed separately;
+`top` detects it. The standard variant can run without elevation; hardware-monitor
+variants require administration and are outside this setup. `tree` presentation uses eza rather than Windows
+`tree.exe` (which has different flags). `code`, IPython, language servers,
+Treesitter compiler/build prerequisites, GnuPG and other advanced tools are
+independent optional installations. The Lua/Python LSP configuration is shared;
+install `lua-language-server` and `pyright` on PATH yourself. Plugin resolution,
+compiler integration and upstream runtime compatibility remain unverified;
+Neovim's first normal start can use the network, just as on Linux.
+
+```powershell
+# On a real Windows 11 machine, from native PowerShell 7:
+make --version
+make help
+make doctor
+make test
+# The same suite without Make, also usable from PowerShell 7 on Linux:
+pwsh -NoLogo -NoProfile -NonInteractive -File ./tests/windows/run.ps1
+# Bash lint independently (native ShellCheck required, otherwise diagnostic):
+make shellcheck
+```
+
+Tests need PowerShell 7.4+, Git and GNU Make. Neovim syntax checking is performed
+when nvim exists (otherwise explicitly skipped). No Pester dependency exists.
+They parse every declared PowerShell source, use explicit temporary homes,
+verify repeat installs and unique backups, shared Git includes/Neovim files,
+profile loading/local overrides, missing tools, built-ins, ll with/without eza,
+path metacharacters, symlink conflicts and rejected parents, native Make dispatch
+and failure codes. Symlink success tests are explicitly skipped on hosts lacking
+permission after asserting clean failure; copy mode must still pass. Tests use
+mocks and temporary fixtures, do not install anything, access the network, load
+the real profile, or execute Neovim plugins. Real HOME/private-directory metadata
+is observed without reading private contents, and must remain unchanged.
+
+Development validation used Linux plus a portable PowerShell 7.6.9 runtime:
+Linux regression/ShellCheck and the PowerShell suite passed, including GNU
+Make's Windows branch via a temporary `pwsh.exe` link. **No real Windows 11 run
+has been performed.** Native Windows process quoting, WinGet/bootstrap, policy,
+Developer Mode/NTFS permissions, Windows Terminal startup, clipboard, editor
+integration and plugin runtime still need the above Windows checks and an
+interactive smoke test. No cloud CI was added.
+
+## Linux installation
 
 Review `install-manifest.sh`, `gitconfig` (including the personal identity), and
 the shell sources before installing. Keep this checkout at a stable path:

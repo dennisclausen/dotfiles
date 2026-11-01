@@ -74,3 +74,43 @@ filesystem transaction; documented recovery and retry apply after I/O failures.
 Owner decisions remaining: effective LSP settings/consolidation, plugin revision
 and lockfile policy, broader dependency provisioning, `prikey` policy, retirement
 of `.bashprofile`, and replacement/removal of legacy system/container targets.
+
+## Native Windows support — 2026-11-01
+
+Based on `dev` at `3414d6b`; implementation lives on
+`codex/windows-powershell`. The existing `.bashrc` and `ANALYSIS.md` hashes above
+remain unchanged and are excluded from the Windows commits.
+
+Decisions: retain all Bash sources, the Linux manifest/installer and apt default;
+require PowerShell 7.4+ for the .NET filesystem APIs; use an `OS=Windows_NT` Make
+branch that invokes PowerShell directly, with explicit exit propagation. Windows `all` only installs configuration; package installation
+is an explicit WinGet workflow. Native Make is `ezwinports.make` (verified official
+manifest, 4.4.1); package IDs are data and rechecked at installation time. User
+scope is requested; Neovim’s machine-only MSI is reported for manual portable
+installation and skipped. No automatic escalation or competing package manager.
+
+The Windows installer has six explicit shared file mappings, plus a generated
+Git include and a marked loader block in runtime CurrentUserAllHosts. It checks
+parents, source availability, collisions and directory conflicts before writes.
+Symlink capability is probed before configuration changes; Copy requires explicit
+selection. Correct links/copies remain untouched; conflicts get unique sibling
+rename backups. Existing profile text remains, with a backup before changes.
+Reparse parents/profile links require manual resolution, including cloud-backed
+ancestors. No private-directory content is accessed. Installation remains
+sequential with documented recovery; concurrent mutation is unsupported.
+
+The profile imports a small module once, preserving PowerShell object commands
+and `gc`, then loads an optional untracked local override. No network, PATH edits,
+agent startup or tool initialization occurs at startup. Shared Git/Neovim content
+is unchanged. `.gitattributes` fixes source line endings for Windows checkouts.
+The README matrix records exactly which helpers are exported and which remain
+Bash-only; no private-key helper or Unix system-mutating equivalent was added.
+
+Local validation: all original Linux regressions and ShellCheck pass; all new
+PowerShell regressions pass under portable PowerShell 7.6.9 on Linux. Native GNU
+Make exercised the Windows branch through a temporary `pwsh.exe` link, including
+special-character checkout paths and failed child exit codes. This does not
+validate Windows CreateProcess, NTFS/Developer Mode, WinGet, execution policy,
+Windows Terminal, clipboard, plugin runtime or ARM64. Run the README's local
+Windows commands and interactive smoke tests before integrating into `dev`.
+No packages installed, real-home installation, push, merge, release or CI added.
