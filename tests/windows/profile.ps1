@@ -3,7 +3,9 @@ param([string] $Repository, [string] $Work, [string] $ProfilePath)
 $ErrorActionPreference = 'Stop'
 function Assert([bool] $Condition, [string] $Message) { if (-not $Condition) { throw $Message } }
 $PROFILE = [pscustomobject]@{ CurrentUserAllHosts = $ProfilePath }
-$env:PATH = Join-Path $Work 'tools'
+# A semicolon is valid in the fixture home but separates PATH entries on Windows.
+# Keep only the executable search directory outside that home.
+$env:PATH = Join-Path (Split-Path -Parent $Work) 'profile-tools'
 [void][IO.Directory]::CreateDirectory($env:PATH)
 $local = Join-Path (Split-Path -Parent $ProfilePath) 'dotfiles.local.ps1'
 [IO.File]::WriteAllText($local, '$global:DotfilesOverrideCount++; function global:customDotfilesTest { "local" }')
@@ -18,6 +20,7 @@ function v { 'existing user editor' }
 . $ProfilePath
 Assert ((v) -ceq 'existing user editor') 'Profile replaced existing user function'
 Assert ($global:DotfilesOverrideCount -eq 1) 'Local override loaded more than once'
+Assert ($global:ExistingProfileWasLoaded -eq 1) 'Existing profile customization did not run'
 Assert ((customDotfilesTest) -eq 'local') 'Local override unavailable'
 Assert ($env:PATH -ceq $beforePath) 'Profile changed PATH'
 foreach ($name in @('..', '...', '....', '.....', 'dl', 'll', 'l', 'la', 'lsd', 'g', 'ga', 'subsub', 'rgi', 'mkd', 'tmpd', 'fd', 'ffind', 'fode', 'cwd', 'croot')) {
@@ -28,7 +31,9 @@ Assert (-not (Get-Command prikey -ErrorAction SilentlyContinue)) 'Private key sh
 $listing = Join-Path $Work "listing [x] & quote's"
 [void][IO.Directory]::CreateDirectory($listing)
 [IO.File]::WriteAllText((Join-Path $listing 'file.txt'), 'test')
-[IO.File]::WriteAllText((Join-Path $listing '.hidden'), 'test')
+$hiddenFile = Join-Path $listing '.hidden'
+[IO.File]::WriteAllText($hiddenFile, 'test')
+if ($IsWindows) { [IO.File]::SetAttributes($hiddenFile, [IO.FileAttributes]::Hidden) }
 $result = @(ll $listing)
 Assert ($result.Count -eq 2 -and $result[0] -is [IO.FileInfo]) 'll fallback must return native objects including hidden files'
 $missingFailed = $false
@@ -46,7 +51,7 @@ function New-Stub([string] $Name, [string] $WindowsBody, [string] $UnixBody) {
 }
 New-Stub eza 'echo %*' 'printf "%s\n" "$@"'
 $listingArgs = @(ll $listing)
-if ($IsWindows) { Assert ($listingArgs[0].StartsWith('-la ')) 'll does not call eza -la' }
+if ($IsWindows) { Assert ($listingArgs.Count -eq 1 -and $listingArgs[0] -ceq "-la `"$listing`"") 'll eza argument boundaries changed' }
 else { Assert ($listingArgs[0] -ceq '-la' -and $listingArgs[1] -ceq $listing) 'll eza argument boundaries changed' }
 New-Stub git 'exit /b 23' 'exit 23'
 g status

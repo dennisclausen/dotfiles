@@ -102,6 +102,7 @@ try {
     $before = Snapshot $target
     Run-Installer
     Assert-InstallUnchanged $before (Snapshot $target) 'Copy installation not idempotent'
+    Write-Output 'PASS: repeat Copy installation preserved timestamps, contents and backups'
     $outside = Join-Path $work 'outside-sentinel'; [IO.File]::WriteAllText($outside, 'keep')
     [IO.File]::WriteAllText((Join-Path $target '.gitignore'), 'local edits')
     Run-Installer
@@ -142,7 +143,8 @@ try {
     # Developer Mode must instead pass the capability failure and copy tests.
     New-Case 'symlink-install'
     Run-Installer Symlink
-    if ($installExit -eq 0) {
+    $canSymlink = $installExit -eq 0
+    if ($canSymlink) {
         $before = Snapshot $target
         Run-Installer Symlink
         Assert-InstallUnchanged $before (Snapshot $target) 'Symlinks not idempotent'
@@ -153,17 +155,31 @@ try {
         Assert ($installExit -eq 0) 'Dangling-link conflict failed'
         $backups = @(Get-ChildItem -LiteralPath $target -Directory -Force | Where-Object Name -Like '.gitignore.dotfiles-backup.*')
         Assert ((Get-Item -LiteralPath (Join-Path $backups[0].FullName 'original') -Force).LinkTarget -ceq 'missing-target') 'Link target changed in backup'
-        New-Case 'redirected-parent'
-        [void][IO.Directory]::CreateSymbolicLink((Join-Path $target 'AppData'), $work)
-        Run-Installer
-        Assert ($installExit -ne 0 -and -not (Test-Path -LiteralPath (Join-Path $target '.gitignore'))) 'Symlink parent allowed writes'
-        # Remove only the link, never recurse through its target during cleanup.
-        [IO.Directory]::Delete((Join-Path $target 'AppData'))
-        Write-Output 'PASS: symlink installs, repeats, dangling conflicts, redirected-parent rejection'
+        Write-Output 'PASS: symlink installs, repeats and dangling conflicts'
     } else {
-        Assert (($installOutput -join "`n") -like '*Cannot create symlinks*') "Unexpected symlink failure: $installOutput"
+        Assert (($installOutput -join "`n") -like '*Cannot create symlinks*explicitly rerun with -Mode Copy*') "Unexpected symlink failure: $installOutput"
         Assert (-not @(Get-ChildItem -LiteralPath $target -Force).Count) 'Failed capability probe modified configuration'
-        Write-Output 'SKIP: symlink success cases (host lacks permission); clean failure and copy installation verified'
+        Run-Installer Copy
+        Assert ($installExit -eq 0 -and [IO.File]::Exists($profileFile)) "Explicit Copy retry failed: $installOutput"
+        Write-Output 'SKIP: symlink success cases (host lacks permission); clean failure and explicit Copy retry verified'
+    }
+    if ($IsWindows -or $canSymlink) {
+        New-Case 'redirected-parent'
+        $redirect = Join-Path $target 'AppData'
+        $external = Join-Path $work 'redirect-destination'
+        [void][IO.Directory]::CreateDirectory($external)
+        if ($canSymlink) { [void][IO.Directory]::CreateSymbolicLink($redirect, $external) }
+        else {
+            # NTFS junctions also redirect writes and need no symlink privilege.
+            $null = New-Item -ItemType Junction -Path $redirect -Target $external
+        }
+        try {
+            Run-Installer
+            Assert ($installExit -ne 0 -and ($installOutput -join "`n") -like '*reparse parent*') "Redirected parent accepted: $installOutput"
+            Assert (@(Get-ChildItem -LiteralPath $target -Force).Count -eq 1 -and
+                -not @(Get-ChildItem -LiteralPath $external -Force).Count) 'Redirected parent allowed writes'
+        } finally { [IO.Directory]::Delete($redirect) }
+        Write-Output 'PASS: redirected parent rejected before writes'
     }
     New-Case 'missing-source'
     $missingSource = Join-Path $fixture '.config/nvim/lua/settings.lua'
@@ -205,6 +221,8 @@ try {
     $env:DOTFILES_TARGET_HOME = $target
     $env:DOTFILES_PROFILE_PATH = $profileFile
     $env:DOTFILES_LOCALAPPDATA = $localData
+    $output = & $make --no-print-directory -C $fixture 2>&1
+    Assert ($LASTEXITCODE -eq 0 -and [IO.File]::Exists($profileFile)) "Make Windows default install: $output"
     foreach ($goal in @('help', 'doctor', 'dotfiles', 'all')) {
         $output = & $make --no-print-directory -C $fixture $goal 2>&1
         Assert ($LASTEXITCODE -eq 0) "Make Windows $goal : $output"
@@ -226,7 +244,7 @@ try {
     $env:DOTFILES_INSTALL_MODE = 'Invalid'
     $output = & $make --no-print-directory -C $fixture dotfiles 2>&1
     Assert ($LASTEXITCODE -ne 0) 'Make swallowed installer failure'
-    Write-Output 'PASS: GNU Make Windows help/doctor/dotfiles/all, test dispatch, legacy diagnostics, failure propagation'
+    Write-Output 'PASS: GNU Make Windows default/help/doctor/dotfiles/all, test dispatch, legacy diagnostics, failure propagation'
 
     $nvim = Get-Command nvim -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($nvim) {
@@ -238,7 +256,8 @@ try {
         } finally { $env:DOTFILES_LUA_ROOT = $oldLuaRoot }
         Write-Output 'PASS: shared Lua syntax (no plugin execution)'
     } else { Write-Output 'SKIP: Lua syntax requires optional nvim; installed Lua bytes verified' }
-    Assert ((@(Home-Metadata) -join "`n") -ceq $homeBefore) 'Real HOME/private directory metadata changed'
+    $homeAfter = @(Home-Metadata) -join "`n"
+    Assert ($homeAfter -ceq $homeBefore) "Real HOME/private directory metadata changed.`nBefore:`n$homeBefore`nAfter:`n$homeAfter"
     Write-Output 'PASS: real HOME/private directory metadata unchanged'
     Write-Output "PASS: PowerShell regression suite ($($PSVersionTable.PSVersion), Windows=$IsWindows)"
 } catch {

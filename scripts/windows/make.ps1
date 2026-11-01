@@ -30,7 +30,7 @@ try {
         shellcheck {
             $tool = Get-Command shellcheck -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
             if (-not $tool) { throw 'shellcheck is required to lint Bash sources. Install native ShellCheck separately; Windows make test does not require Bash lint.' }
-            Push-Location (Join-Path $PSScriptRoot '../..')
+            Push-Location -LiteralPath (Join-Path $PSScriptRoot '../..')
             try {
                 & $tool --shell=bash --external-sources --source-path=SCRIPTDIR -- .bashrc .bash_profile .bashprofile .bash_prompt .aliases .functions install-manifest.sh install.sh shellcheck.sh tests/run.sh tests/helpers.sh
                 exit $LASTEXITCODE
