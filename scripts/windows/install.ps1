@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 [CmdletBinding()]
 param(
-    [ValidateSet('Symlink', 'Copy')][string] $Mode = 'Symlink',
+    [ValidateSet('Symlink', 'Copy')][string] $Mode = 'Copy',
     [string] $TargetHome,
     [string] $ProfilePath,
     [string] $LocalAppData
@@ -99,6 +99,9 @@ try {
         }
     }
 
+    if ($Mode -eq 'Copy') {
+        Write-Warning 'Copy mode copies shared files. Rerun make dotfiles after repository updates to refresh the copies. Live links require explicit -Mode Symlink and Windows symlink permission.'
+    }
     if ($Mode -eq 'Symlink') {
         # Probe capability before backing up anything. Never elevate or switch modes.
         $probe = Join-Path $TargetHome ('.dotfiles-link-probe.' + [guid]::NewGuid().ToString('N'))

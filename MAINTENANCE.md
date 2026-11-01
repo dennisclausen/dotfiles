@@ -92,8 +92,9 @@ installation and skipped. No automatic escalation or competing package manager.
 The Windows installer has six explicit shared file mappings, plus a generated
 Git include and a marked loader block in runtime CurrentUserAllHosts. It checks
 parents, source availability, collisions and directory conflicts before writes.
-Symlink capability is probed before configuration changes; Copy requires explicit
-selection. Correct links/copies remain untouched; conflicts get unique sibling
+Copy is the default and warns to rerun after updates. Explicit Symlink mode
+probes capability before configuration changes. Correct links/copies remain
+untouched. Conflicts get unique sibling
 rename backups. Existing profile text remains, with a backup before changes.
 Reparse parents/profile links require manual resolution, including cloud-backed
 ancestors. No private-directory content is accessed. Installation remains

@@ -42,20 +42,21 @@ make doctor
 make dotfiles
 ```
 
-The default installation uses file symlinks. If Developer Mode or the necessary
-symlink permission is unavailable, installation stops before changing any
-configuration. Explicitly choose the copy alternative (no privilege required):
+The default installation uses Copy mode, which works without symlink permission.
+`make`, `make all` and `make dotfiles` print a warning to rerun after repository
+updates to refresh copied files. No installation-mode environment variable is
+needed. To bypass Make, run:
 
 ```powershell
-$env:DOTFILES_INSTALL_MODE = 'Copy'
-make dotfiles
+pwsh -NoProfile -File ./scripts/windows/install.ps1
 ```
 
-Keep that setting for later installs in this session; set it again in future
-sessions when using copy mode. Alternatively, bypass Make:
+For live file symlinks, explicitly choose Symlink mode. This requires Windows
+symlink permission, such as Developer Mode. A failed capability check stops
+before changing configuration:
 
 ```powershell
-pwsh -NoProfile -File ./scripts/windows/install.ps1 -Mode Copy
+pwsh -NoProfile -File ./scripts/windows/install.ps1 -Mode Symlink
 ```
 
 Open a fresh PowerShell 7 session after installation. `ll`, `..`, `g` and the
@@ -135,8 +136,9 @@ folders accordingly.
 
 Correct links and byte-identical copies are left untouched. Copy mode copies
 only the manifest resources; Git and the profile still load code/configuration
-from the checkout. Mode changes are explicit and back up the previous file or
-link. Installation is sequential, not transactional: resolve any I/O failure
+from the checkout. Changing modes backs up the previous file or link. Existing
+`DOTFILES_INSTALL_MODE` overrides are still respected by Make. Installation is
+sequential, not transactional: resolve any I/O failure
 and rerun. Do not run concurrent installs or modify destinations during a run.
 No automatic fallback, forced replacement, recursive directory replacement or
 privilege escalation occurs.

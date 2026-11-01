@@ -22,7 +22,7 @@ try {
         help {
             Write-Output @(
                 'make / all   Install Windows configuration only (no packages).'
-                'dotfiles     Install explicit Windows manifest; default Symlink, explicit Copy supported.'
+                'dotfiles     Install Windows configuration in Copy mode; warns to rerun after updates. Symlink is optional.'
                 'test         Offline PowerShell, installer, shared config and native Make regressions.'
                 'doctor       Report required/optional applications; no network or installation.'
                 'tools        Explicitly install the reviewed WinGet tool bundle for this user; report manual tools.'

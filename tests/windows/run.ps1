@@ -17,8 +17,10 @@ function Home-Metadata {
 }
 $homeBefore = @(Home-Metadata) -join "`n"
 function Assert([bool] $Condition, [string] $Message) { if (-not $Condition) { throw $Message } }
-function Run-Installer([string] $Mode = 'Copy') {
-    $script:installOutput = & $pwsh -NoLogo -NoProfile -NonInteractive -File (Join-Path $fixture 'scripts/windows/install.ps1') -Mode $Mode -TargetHome $target -ProfilePath $profileFile -LocalAppData $localData 2>&1
+function Run-Installer([string] $Mode) {
+    $modeArguments = @()
+    if ($Mode) { $modeArguments = @('-Mode', $Mode) }
+    $script:installOutput = & $pwsh -NoLogo -NoProfile -NonInteractive -File (Join-Path $fixture 'scripts/windows/install.ps1') @modeArguments -TargetHome $target -ProfilePath $profileFile -LocalAppData $localData 2>&1
     $script:installExit = $LASTEXITCODE
 }
 function Snapshot([string] $Root) {
@@ -87,6 +89,7 @@ try {
     $oldGitTime = [IO.File]::GetLastWriteTimeUtc($oldGitConfig)
     Run-Installer
     Assert ($installExit -eq 0) "Fresh copy installation: $installOutput"
+    Assert (($installOutput -join "`n") -like '*Copy mode copies shared files*Rerun make dotfiles*') 'Default Copy notice missing'
     Assert ([IO.File]::ReadAllText($profileFile).StartsWith($existingProfile)) 'Existing profile content lost'
     foreach ($entry in $manifest.Shared) {
         $root = if ($entry.Root -eq 'Home') { $target } else { $localData }
@@ -155,6 +158,10 @@ try {
         Assert ($installExit -eq 0) 'Dangling-link conflict failed'
         $backups = @(Get-ChildItem -LiteralPath $target -Directory -Force | Where-Object Name -Like '.gitignore.dotfiles-backup.*')
         Assert ((Get-Item -LiteralPath (Join-Path $backups[0].FullName 'original') -Force).LinkTarget -ceq 'missing-target') 'Link target changed in backup'
+        Run-Installer
+        Assert ($installExit -eq 0 -and
+            -not ((Get-Item -LiteralPath $dest -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -and
+            (Get-FileHash -LiteralPath $dest).Hash -ceq (Get-FileHash -LiteralPath (Join-Path $fixture 'gitignore')).Hash) 'Default Copy did not safely replace symlink'
         Write-Output 'PASS: symlink installs, repeats and dangling conflicts'
     } else {
         Assert (($installOutput -join "`n") -like '*Cannot create symlinks*explicitly rerun with -Mode Copy*') "Unexpected symlink failure: $installOutput"
@@ -217,7 +224,7 @@ try {
     }
     $env:OS = 'Windows_NT'
     New-Case 'make installation'
-    $env:DOTFILES_INSTALL_MODE = 'Copy'
+    $env:DOTFILES_INSTALL_MODE = $null
     $env:DOTFILES_TARGET_HOME = $target
     $env:DOTFILES_PROFILE_PATH = $profileFile
     $env:DOTFILES_LOCALAPPDATA = $localData
@@ -243,6 +250,7 @@ try {
         $output = & $make --no-print-directory -C $fixture 2>&1
         Assert ($LASTEXITCODE -eq 0 -and [IO.File]::Exists($profileFile) -and
             -not [IO.File]::Exists($env:DOTFILES_WINGET_LOG)) "Make Windows default install: $output"
+        Assert (($output -join "`n") -like '*Copy mode copies shared files*Rerun make dotfiles*') 'Make default Copy notice missing'
         foreach ($goal in @('help', 'doctor', 'dotfiles', 'all')) {
             $output = & $make --no-print-directory -C $fixture $goal 2>&1
             Assert ($LASTEXITCODE -eq 0 -and -not [IO.File]::Exists($env:DOTFILES_WINGET_LOG)) "Make Windows $goal failed or invoked package installation: $output"
