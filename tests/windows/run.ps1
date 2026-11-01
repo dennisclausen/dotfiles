@@ -227,8 +227,10 @@ try {
         $output = & $make --no-print-directory -C $fixture $goal 2>&1
         Assert ($LASTEXITCODE -eq 0) "Make Windows $goal : $output"
         if ($goal -eq 'doctor') {
-            Assert (($output -join "`n") -match 'Command\s+Required\s+Available\s+WingetId' -and
-                ($output -join "`n") -match 'Microsoft.PowerShell') "Make doctor report missing: $output"
+            # PowerShell colours each table column separately on ANSI terminals.
+            $doctorReport = ($output -join "`n") -replace '\x1b\[[0-9;]*m', ''
+            Assert ($doctorReport -match 'Command\s+Required\s+Available\s+WingetId' -and
+                $doctorReport -match 'Microsoft.PowerShell') "Make doctor report missing: $output"
         }
     }
     $output = & $make --no-print-directory -C $fixture -n test 2>&1
