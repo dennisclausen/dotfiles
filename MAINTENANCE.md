@@ -106,30 +106,38 @@ is unchanged. `.gitattributes` fixes source line endings for Windows checkouts.
 The README matrix records exactly which helpers are exported and which remain
 Bash-only; no private-key helper or Unix system-mutating equivalent was added.
 
-Local validation: all original Linux regressions and ShellCheck pass; all new
-PowerShell regressions pass under portable PowerShell 7.6.9 on Linux. Native GNU
-Make exercised the Windows branch through a temporary `pwsh.exe` link, including
-special-character checkout paths and failed child exit codes. This does not
-validate Windows CreateProcess, NTFS/Developer Mode, WinGet, execution policy,
-Windows Terminal, clipboard, plugin runtime or ARM64. Run the README's local
-Windows commands and interactive smoke tests before integrating into `dev`.
-No packages installed, real-home installation, push, merge, release or CI added.
+Initial Linux runs passed the Bash regressions, ShellCheck and the PowerShell
+suite on 7.6.9. GNU Make exercised the Windows branch through a temporary
+`pwsh.exe` link. The owner subsequently confirmed the Make bootstrap and
+`make doctor` on Windows.
 
+### Native Windows verification
 
-### First Windows feedback
+On Windows 11 x64 (build 26300, NTFS), the original snapshot read an older
+last-write time for the enumerated `nvim\lua` directory. Calling `Refresh()`
+returned its current timestamp **before** invoking the installer again. The
+repeat Copy invocation exited 0 and printed only the completion message. The
+original snapshots differed on that timestamp while the refreshed snapshots
+matched, including the file hashes. The refresh in `02f9caa` fixes the
+reproduced failure. Keep the timestamp, hash, backup and link checks.
 
-The owner confirmed native `make doctor` succeeds after fetching the feature
-branch and bootstrapping Make. A new terminal launched Windows PowerShell 5.1,
-which intentionally does not load the PowerShell 7 profile; README now explains
-`pwsh` and the Windows Terminal default-profile setting. The first native
-`make test` stopped at the repeated-copy assertion. Snapshot checks now refresh
-filesystem metadata before comparing, include content hashes, and retain the
-full metadata assertion while reporting the installer exit/output and exact
-before/after differences. The failure's cause is not established from the old
-generic error. Linux and PowerShell-on-Linux checks pass; a Windows rerun is
-required to confirm whether stale metadata was responsible or diagnose a
-remaining installer failure. A follow-up adds a test-source fingerprint and
-writes multiline failures directly to stderr to avoid nested PowerShell error
-formatting. A deliberate snapshot failure was exercised through GNU Make locally
-to verify diagnostic preservation and nonzero exit propagation. No installer
-safety check was relaxed.
+The next failure at `124de2f` came from putting the test stub directory
+inside a home whose name contains a semicolon. Windows split that PATH entry
+and `ll` correctly returned native objects. Only the stubs moved to a sibling
+directory. The checkout, home and argument passed to eza retain the fixture
+characters. The native ShellCheck dispatcher now enters the checkout using a
+literal path so square brackets also work when invoked from another directory.
+
+The offline suite passed in an unelevated session on PowerShell 7.4.22 and
+7.6.5 with GNU Make 4.4.1 and Git 2.53.0.windows.3. It exercised default and
+named Make goals, a disposable installed profile, native process arguments,
+backups, Copy retries, junction rejection and all five Lua syntax checks.
+The OS denied a direct file symlink probe with error 1314. The installer
+reported the explicit Copy alternative and left the target empty before the
+retry. An injected failure after junction creation removed the test root and
+preserved a sentinel outside it. Native ShellCheck 0.11.0 passed, and an
+installed fixture profile ran real eza and Git navigation helpers.
+
+The Windows runs used temporary portable tools and explicit test destinations.
+Successful Windows symlink creation, interactive Terminal startup, clipboard,
+plugin/LSP and editor integrations, and ARM64 still need separate validation.

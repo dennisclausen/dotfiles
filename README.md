@@ -61,7 +61,8 @@ pwsh -NoProfile -File ./scripts/windows/install.ps1 -Mode Copy
 Open a fresh PowerShell 7 session after installation. `ll`, `..`, `g` and the
 other helpers are then available. A terminal banner saying **Windows PowerShell**
 means you opened version 5.1, which uses a different profile. Run `pwsh` to enter
-PowerShell 7 and check `$PSVersionTable.PSVersion` (7.4 or newer). In Windows
+PowerShell 7. Check `$PSVersionTable.PSVersion` (7.4 or newer) and run
+`$PROFILE.CurrentUserAllHosts` to see where the installer places the loader. In Windows
 Terminal, choose **Settings → Startup → Default profile → PowerShell** (the
 PowerShell 7 entry), then save. Installing PowerShell 7 does not automatically
 change the terminal's default profile. `make` / `make all` install configuration only
@@ -253,7 +254,7 @@ make --version
 make help
 make doctor
 make test
-# The same suite without Make, also usable from PowerShell 7 on Linux:
+# Direct entry point (the suite still exercises GNU Make):
 pwsh -NoLogo -NoProfile -NonInteractive -File ./tests/windows/run.ps1
 # Bash lint independently (native ShellCheck required, otherwise diagnostic):
 make shellcheck
@@ -274,19 +275,19 @@ path metacharacters, symlink conflicts and rejected parents, native Make dispatc
 and failure codes. Symlink success tests are explicitly skipped on hosts lacking
 permission after asserting clean failure; copy mode must still pass. Tests use
 mocks and temporary fixtures, do not install anything, access the network, load
-the real profile, or execute Neovim plugins. Real HOME/private-directory metadata
-is observed without reading private contents, and must remain unchanged.
+the real profile, or execute Neovim plugins. The final check compares metadata
+on the real home and selected private directory entries without reading their
+contents. Run it in a quiet user session. Other processes updating those
+directories during the suite can trip the check. Its before/after output
+identifies the changed entry.
 
-Development validation used Linux plus a portable PowerShell 7.6.9 runtime:
-Linux regression/ShellCheck and the PowerShell suite passed, including GNU
-Make's Windows branch via a temporary `pwsh.exe` link. A subsequent Windows 11 run confirmed native `make doctor`, but stopped at the
-repeated-copy regression assertion; a complete Windows suite pass is still
-pending. Snapshot checks now refresh filesystem metadata and report the installer
-output and exact differences on failure. Native Windows process quoting,
-WinGet/bootstrap, policy,
-Developer Mode/NTFS permissions, Windows Terminal startup, clipboard, editor
-integration and plugin runtime still need the above Windows checks and an
-interactive smoke test. No cloud CI was added.
+The native suite passed on Windows 11 x64 with PowerShell 7.4.22 and 7.6.5,
+GNU Make 4.4.1 and an unelevated NTFS home fixture. The runs covered Copy
+idempotency, symlink permission denial and the explicit Copy retry, junction
+rejection, profile loading, Git includes and all five Neovim files. Native
+ShellCheck also passed. Windows symlink creation with permission, Terminal
+startup, clipboard, editor and plugin integrations, and ARM64 remain unverified.
+Earlier Linux runs passed Bash regressions, ShellCheck and the PowerShell suite.
 
 ## Linux installation
 
