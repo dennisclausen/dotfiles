@@ -23,19 +23,19 @@ calc() {
 
 # Create a new directory and enter it
 mkd() {
-	mkdir -p "$@"
-	cd "$@" || exit
+	mkdir -p "$@" || return 1
+	cd "$@" || return 1
 }
 
 # Make a temporary directory and enter it
 tmpd() {
 	local dir
 	if [ $# -eq 0 ]; then
-		dir=$(mktemp -d)
+		dir=$(mktemp -d) || return 1
 	else
-		dir=$(mktemp -d -t "${1}.XXXXXXXXXX")
+		dir=$(mktemp -d -t "${1}.XXXXXXXXXX") || return 1
 	fi
-	cd "$dir" || exit
+	cd "$dir" || return 1
 }
 
 # Create a .tar.gz archive, using `zopfli`, `pigz` or `gzip` for compression
@@ -328,7 +328,7 @@ repo() {
 	# Validate that this folder is a git folder
 	if ! git branch 2>/dev/null 1>&2; then
 		echo "Not a git repo!"
-		exit 1
+		return 1
 	fi
 
 	# Find current directory relative to .git parent
@@ -336,7 +336,7 @@ repo() {
 	git_base_path=$(
 		cd "./$(git rev-parse --show-cdup)" || exit 1
 		pwd
-	)
+	) || return 1
 	relative_path=${full_path#"$git_base_path"} # remove leading git_base_path from working directory
 
 	# If filename argument is present, append it
@@ -383,7 +383,7 @@ man() {
 openimage() {
 	local types='*.jpg *.JPG *.png *.PNG *.gif *.GIF *.jpeg *.JPEG'
 
-	cd "$(dirname "$1")" || exit
+	cd "$(dirname "$1")" || return 1
 	local file
 	file=$(basename "$1")
 
@@ -409,11 +409,12 @@ dbs() {
 # check if uri is up
 isup() {
 	local uri=$1
+	local status
 
-	if curl -s --head --request GET "$uri" | grep "200 OK" >/dev/null; then
-		notify-send --urgency=critical "$uri is down"
-	else
+	if status=$(curl -s --head --request GET --output /dev/null --write-out '%{http_code}' -- "$uri") && [[ "$status" == 200 ]]; then
 		notify-send --urgency=low "$uri is up"
+	else
+		notify-send --urgency=critical "$uri is down"
 	fi
 }
 
@@ -490,7 +491,7 @@ gogo() {
 golistdeps() {
 	(
 		if [[ -n "$1" ]]; then
-			gogo "$@"
+			gogo "$@" || exit 1
 		fi
 
 		go list -e -f '{{join .Deps "\n"}}' ./... | xargs go list -e -f '{{if not .Standard}}{{.ImportPath}}{{end}}'
@@ -591,11 +592,11 @@ activate() {
 fode() {
 	if ! command -v code &> /dev/null; then
 		echo "code not found"
-		exit
+		return 1
 	fi
 	if ! command -v fzf &> /dev/null; then
 		echo "fzf not found"
-		exit
+		return 1
 	fi
 
 	# separate item with NULL character and not with whitespace
@@ -607,7 +608,7 @@ fode() {
 fzchmod(){
 	if ! command -v fzf &> /dev/null; then
 		echo "fzf not found"
-		exit
+		return 1
 	fi
 
 	fzf --print0 | xargs -0 -o chmod "$1"
@@ -616,7 +617,7 @@ fzchmod(){
 ffind(){
 	if ! command -v fzf &> /dev/null; then
 		echo "fzf not found"
-		exit
+		return 1
 	fi
 
 	local dest=$1
@@ -632,21 +633,21 @@ ffind(){
 # fd - cd to selected directory
 fd() {
   local dir
-  dir=$(find ${1:-.} -type d 2> /dev/null | fzf +m) && cd "$dir"
+  dir=$(find "${1:-.}" -type d 2> /dev/null | fzf +m) || return 1
+  cd "$dir" || return 1
 }
 
 fkill() {
   local pid
-  pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+  pid=$(set -o pipefail; ps -ef | sed 1d | fzf -m | awk '{print $2}') || return 1
 
-  if [ "x$pid" != "x" ]
+  if [ -n "$pid" ]
   then
-    echo $pid | xargs kill -${1:-9}
+    printf '%s\n' "$pid" | xargs kill "-${1:-9}"
   fi
 }
 
 fapt() {
-    local package
     apt-cache search . | fzf --preview 'apt-cache show {1}' --preview-window=right:60%:wrap | cut -d' ' -f1
 }
 
