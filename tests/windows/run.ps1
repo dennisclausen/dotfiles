@@ -23,8 +23,21 @@ function Run-Installer([string] $Mode = 'Copy') {
 }
 function Snapshot([string] $Root) {
     @(Get-ChildItem -LiteralPath $Root -Recurse -Force | Sort-Object FullName | ForEach-Object {
-        "$($_.FullName)|$($_.LastWriteTimeUtc.Ticks)|$($_.Length)|$($_.LinkTarget)"
+        # Windows directory enumeration can return cached file metadata. Refresh
+        # from the filesystem before comparing metadata across installer runs.
+        $_.Refresh()
+        $hash = if (-not $_.PSIsContainer -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            (Get-FileHash -LiteralPath $_.FullName).Hash
+        } else { '' }
+        "$($_.FullName)|$($_.LastWriteTimeUtc.Ticks)|$($_.Length)|$($_.LinkTarget)|$hash"
     }) -join "`n"
+}
+function Assert-InstallUnchanged([string] $Before, [string] $After, [string] $Context) {
+    if ($installExit -ne 0 -or $Before -cne $After) {
+        $difference = Compare-Object -ReferenceObject @($Before -split "`n") -DifferenceObject @($After -split "`n") |
+            ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }
+        throw "$Context`nInstaller exit: $installExit`nInstaller output:`n$($installOutput -join "`n")`nSnapshot differences (<= before; => after):`n$($difference -join "`n")"
+    }
 }
 function New-Case([string] $Name) {
     $script:target = Join-Path $work $Name
@@ -86,7 +99,7 @@ try {
     Assert ($profileBackup.Count -eq 1) 'Existing profile not backed up'
     $before = Snapshot $target
     Run-Installer
-    Assert ($installExit -eq 0 -and (Snapshot $target) -ceq $before) 'Copy installation not idempotent'
+    Assert-InstallUnchanged $before (Snapshot $target) 'Copy installation not idempotent'
     $outside = Join-Path $work 'outside-sentinel'; [IO.File]::WriteAllText($outside, 'keep')
     [IO.File]::WriteAllText((Join-Path $target '.gitignore'), 'local edits')
     Run-Installer
@@ -130,7 +143,7 @@ try {
     if ($installExit -eq 0) {
         $before = Snapshot $target
         Run-Installer Symlink
-        Assert ($installExit -eq 0 -and (Snapshot $target) -ceq $before) 'Symlinks not idempotent'
+        Assert-InstallUnchanged $before (Snapshot $target) 'Symlinks not idempotent'
         $dest = Join-Path $target '.gitignore'
         [IO.File]::Delete($dest)
         [void][IO.File]::CreateSymbolicLink($dest, 'missing-target')

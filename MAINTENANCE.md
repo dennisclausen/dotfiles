@@ -114,3 +114,18 @@ validate Windows CreateProcess, NTFS/Developer Mode, WinGet, execution policy,
 Windows Terminal, clipboard, plugin runtime or ARM64. Run the README's local
 Windows commands and interactive smoke tests before integrating into `dev`.
 No packages installed, real-home installation, push, merge, release or CI added.
+
+
+### First Windows feedback
+
+The owner confirmed native `make doctor` succeeds after fetching the feature
+branch and bootstrapping Make. A new terminal launched Windows PowerShell 5.1,
+which intentionally does not load the PowerShell 7 profile; README now explains
+`pwsh` and the Windows Terminal default-profile setting. The first native
+`make test` stopped at the repeated-copy assertion. Snapshot checks now refresh
+filesystem metadata before comparing, include content hashes, and retain the
+full metadata assertion while reporting the installer exit/output and exact
+before/after differences. The failure's cause is not established from the old
+generic error. Linux and PowerShell-on-Linux checks pass; a Windows rerun is
+required to confirm whether stale metadata was responsible or diagnose a
+remaining installer failure. No installer safety check was relaxed.

@@ -59,7 +59,12 @@ pwsh -NoProfile -File ./scripts/windows/install.ps1 -Mode Copy
 ```
 
 Open a fresh PowerShell 7 session after installation. `ll`, `..`, `g` and the
-other helpers are then available. `make` / `make all` install configuration only
+other helpers are then available. A terminal banner saying **Windows PowerShell**
+means you opened version 5.1, which uses a different profile. Run `pwsh` to enter
+PowerShell 7 and check `$PSVersionTable.PSVersion` (7.4 or newer). In Windows
+Terminal, choose **Settings → Startup → Default profile → PowerShell** (the
+PowerShell 7 entry), then save. Installing PowerShell 7 does not automatically
+change the terminal's default profile. `make` / `make all` install configuration only
 on Windows. They never run apt or install packages. Linux retains its existing
 default apt workflow.
 
@@ -268,8 +273,11 @@ is observed without reading private contents, and must remain unchanged.
 
 Development validation used Linux plus a portable PowerShell 7.6.9 runtime:
 Linux regression/ShellCheck and the PowerShell suite passed, including GNU
-Make's Windows branch via a temporary `pwsh.exe` link. **No real Windows 11 run
-has been performed.** Native Windows process quoting, WinGet/bootstrap, policy,
+Make's Windows branch via a temporary `pwsh.exe` link. A subsequent Windows 11 run confirmed native `make doctor`, but stopped at the
+repeated-copy regression assertion; a complete Windows suite pass is still
+pending. Snapshot checks now refresh filesystem metadata and report the installer
+output and exact differences on failure. Native Windows process quoting,
+WinGet/bootstrap, policy,
 Developer Mode/NTFS permissions, Windows Terminal startup, clipboard, editor
 integration and plugin runtime still need the above Windows checks and an
 interactive smoke test. No cloud CI was added.
