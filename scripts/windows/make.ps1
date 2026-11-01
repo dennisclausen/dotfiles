@@ -14,7 +14,10 @@ try {
             exit $LASTEXITCODE
         }
         test { & "$PSScriptRoot/../../tests/windows/run.ps1"; exit $LASTEXITCODE }
-        doctor { & "$PSScriptRoot/dependencies.ps1"; exit $LASTEXITCODE }
+        doctor {
+            & "$PSScriptRoot/dependencies.ps1" | Format-Table -AutoSize | Out-Host
+            exit $LASTEXITCODE
+        }
         help {
             Write-Output @(
                 'make / all   Install Windows configuration only (no packages).'

@@ -226,6 +226,10 @@ try {
     foreach ($goal in @('help', 'doctor', 'dotfiles', 'all')) {
         $output = & $make --no-print-directory -C $fixture $goal 2>&1
         Assert ($LASTEXITCODE -eq 0) "Make Windows $goal : $output"
+        if ($goal -eq 'doctor') {
+            Assert (($output -join "`n") -match 'Command\s+Required\s+Available\s+WingetId' -and
+                ($output -join "`n") -match 'Microsoft.PowerShell') "Make doctor report missing: $output"
+        }
     }
     $output = & $make --no-print-directory -C $fixture -n test 2>&1
     Assert ($LASTEXITCODE -eq 0 -and ($output -join "`n") -like '*make.ps1 -Target test*') 'Windows make test dispatch'
@@ -269,3 +273,5 @@ try {
     foreach ($name in $environmentNames) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
     if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force }
 }
+# Expected native failures above must not become the successful suite's status.
+exit 0

@@ -141,3 +141,9 @@ installed fixture profile ran real eza and Git navigation helpers.
 The Windows runs used temporary portable tools and explicit test destinations.
 Successful Windows symlink creation, interactive Terminal startup, clipboard,
 plugin/LSP and editor integrations, and ARM64 still need separate validation.
+
+The suite also passes through native Make with Neovim absent. Successful
+completion explicitly exits 0 after cleanup, clearing the status left by the
+expected invalid-mode failure. A failing optional Neovim stub still propagates
+failure. The doctor dispatcher explicitly formats and displays the tool report
+before exiting, and the suite asserts that its output contains the report.
