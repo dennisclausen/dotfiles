@@ -172,6 +172,53 @@ include after inspection, restoring backups as desired. Keep `.gitconfig.local`,
 `dotfiles.local.ps1`, unrelated Neovim files, and backups. Never recursively
 remove the profile or Neovim directory. No automated uninstall deletes user data.
 
+## Ubuntu-style PowerShell appearance
+
+The PowerShell profile uses the same two-line layout and indexed colours as
+`.bash_prompt`. It shows your username, hostname, home-relative directory and
+Git branch. Git markers are `+` for staged changes, `!` for modified files,
+`?` for untracked files and `$` for a stash. Detached HEAD shows a short commit
+ID. The prompt preserves native exit codes and reads Git status without
+refreshing the index. Set your own `prompt` function in `dotfiles.local.ps1`
+to customize it.
+
+Run `make tools` to install eza with the other supported tools. In a fresh
+PowerShell 7 session, `ll` then runs `eza -la`, including the coloured long
+listing and hidden files. Windows permission columns follow the Windows build
+of eza. Without eza, `ll` returns native PowerShell file objects.
+
+For the aubergine background in the Ubuntu screenshot, add this entry to the
+`schemes` array in Windows Terminal's settings JSON, then select **Dotfiles
+Ubuntu** under your PowerShell profile's **Appearance → Color scheme**. Choose
+**Ubuntu Mono** if installed, or use **Cascadia Mono**. These settings are applied
+manually in Windows Terminal. [Windows Terminal colour-scheme documentation](https://learn.microsoft.com/en-us/windows/terminal/customize-settings/color-schemes).
+
+```json
+{
+  "name": "Dotfiles Ubuntu",
+  "background": "#300A24",
+  "foreground": "#EEEEEC",
+  "cursorColor": "#FFFFFF",
+  "selectionBackground": "#555753",
+  "black": "#2E3436",
+  "red": "#CC0000",
+  "green": "#4E9A06",
+  "yellow": "#C4A000",
+  "blue": "#3465A4",
+  "purple": "#75507B",
+  "cyan": "#06989A",
+  "white": "#D3D7CF",
+  "brightBlack": "#555753",
+  "brightRed": "#EF2929",
+  "brightGreen": "#8AE234",
+  "brightYellow": "#FCE94F",
+  "brightBlue": "#729FCF",
+  "brightPurple": "#AD7FA8",
+  "brightCyan": "#34E2E2",
+  "brightWhite": "#EEEEEC"
+}
+```
+
 ## Shell compatibility matrix
 
 Linux commands remain unchanged. Windows functions accept PowerShell arguments;
@@ -216,6 +263,8 @@ No second package manager is introduced. Install selected tools explicitly:
 ```powershell
 # Offline report:
 make doctor
+# Explicitly install the supported tool bundle, including eza for Ubuntu-style ll:
+make tools
 # Explicit network/package operation; user-installable tools, or exact IDs:
 pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install
 pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install -Id eza-community.eza
@@ -223,6 +272,9 @@ pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install -Id eza-commun
 
 The installer checks exact IDs with `winget show` before installing, requests
 user scope, skips applications already on PATH, and stops on the first failure.
+The bundle includes PowerShell, Git, GNU Make, eza, ripgrep, fzf, bat and Python.
+Missing manual integrations are listed at the end. Package operations occur
+only when explicitly requested with `make tools` or `-Install`.
 Neovim's [current WinGet manifest](https://github.com/microsoft/winget-pkgs/blob/master/manifests/n/Neovim/Neovim/0.12.6/Neovim.Neovim.installer.yaml)
 offers a machine-scope MSI only, so the script reports it as manual and continues
 with the other tools. For a user installation, download the Windows ZIP from

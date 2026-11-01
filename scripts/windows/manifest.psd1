@@ -1,6 +1,6 @@
 @{
     ProfileSources = @('powershell/profile.ps1', 'powershell/Dotfiles.psm1',
-        'powershell/navigation.ps1', 'powershell/commands.ps1', 'gitconfig')
+        'powershell/navigation.ps1', 'powershell/commands.ps1', 'powershell/prompt.ps1', 'gitconfig')
     # Five individual files: never replace the user's nvim directory.
     Shared = @(
         @{ Source = 'gitignore'; Root = 'Home'; Destination = '.gitignore' }

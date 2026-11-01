@@ -28,6 +28,13 @@ try {
             & $winget install --exact --id $package.Id --source winget --scope user --disable-interactivity
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         }
+        if (-not $Id) {
+            foreach ($command in $manifest.ManualCommands) {
+                if (-not (Get-Command $command -CommandType Application -ErrorAction SilentlyContinue)) {
+                    Write-Host "Manual optional setup: $command; see README."
+                }
+            }
+        }
         Write-Host 'Open a new terminal to refresh PATH; then run make doctor.'
     } else {
         foreach ($package in $packages) {

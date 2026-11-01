@@ -3,11 +3,11 @@ ifeq ($(OS),Windows_NT)
 SHELL := pwsh.exe
 .SHELLFLAGS := -NoLogo -NoProfile -NonInteractive -Command
 .DEFAULT_GOAL := all
-.PHONY: all dotfiles test shellcheck help doctor check etc usr
+.PHONY: all dotfiles tools test shellcheck help doctor check etc usr
 all: dotfiles
 all:
-	@Write-Output 'Windows setup complete. Optional tools: pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install'
-dotfiles test shellcheck help doctor check etc usr:
+	@Write-Output 'Windows setup complete. Install the optional tool bundle with make tools.'
+dotfiles tools test shellcheck help doctor check etc usr:
 	@& ./scripts/windows/make.ps1 -Target $@; exit $$LASTEXITCODE
 else
 SHELL := bash

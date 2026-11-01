@@ -1,5 +1,5 @@
 #Requires -Version 7.4
-param([Parameter(Mandatory)][ValidateSet('dotfiles', 'test', 'shellcheck', 'help', 'doctor', 'check', 'etc', 'usr')][string] $Target)
+param([Parameter(Mandatory)][ValidateSet('dotfiles', 'tools', 'test', 'shellcheck', 'help', 'doctor', 'check', 'etc', 'usr')][string] $Target)
 $ErrorActionPreference = 'Stop'
 try {
     switch ($Target) {
@@ -14,6 +14,7 @@ try {
             exit $LASTEXITCODE
         }
         test { & "$PSScriptRoot/../../tests/windows/run.ps1"; exit $LASTEXITCODE }
+        tools { & "$PSScriptRoot/dependencies.ps1" -Install; exit $LASTEXITCODE }
         doctor {
             & "$PSScriptRoot/dependencies.ps1" | Format-Table -AutoSize | Out-Host
             exit $LASTEXITCODE
@@ -24,10 +25,11 @@ try {
                 'dotfiles     Install explicit Windows manifest; default Symlink, explicit Copy supported.'
                 'test         Offline PowerShell, installer, shared config and native Make regressions.'
                 'doctor       Report required/optional applications; no network or installation.'
+                'tools        Explicitly install the reviewed WinGet tool bundle for this user; report manual tools.'
                 'shellcheck   Lint Bash sources with native ShellCheck; explicit error if missing.'
                 'check        Legacy Docker check, unavailable while test.sh is missing.'
                 'etc / usr    Unavailable legacy system installation targets.'
-                'Optional tools: pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install'
+                'Install the optional tool bundle: make tools'
             )
         }
         shellcheck {

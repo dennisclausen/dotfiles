@@ -53,7 +53,7 @@ try {
     }
     $env:NVIM_LOG_FILE = Join-Path $work 'nvim.log'
     # Syntax validation parses code without executing it or loading a profile.
-    $psSources = @('powershell/profile.ps1', 'powershell/Dotfiles.psm1', 'powershell/navigation.ps1', 'powershell/commands.ps1',
+    $psSources = @('powershell/profile.ps1', 'powershell/Dotfiles.psm1', 'powershell/navigation.ps1', 'powershell/commands.ps1', 'powershell/prompt.ps1',
         'scripts/windows/common.ps1', 'scripts/windows/install.ps1', 'scripts/windows/manifest.psd1', 'scripts/windows/packages.psd1',
         'scripts/windows/dependencies.ps1', 'scripts/windows/bootstrap.ps1', 'scripts/windows/make.ps1', 'tests/windows/run.ps1', 'tests/windows/profile.ps1')
     foreach ($source in $psSources) {
@@ -221,20 +221,62 @@ try {
     $env:DOTFILES_TARGET_HOME = $target
     $env:DOTFILES_PROFILE_PATH = $profileFile
     $env:DOTFILES_LOCALAPPDATA = $localData
-    $output = & $make --no-print-directory -C $fixture 2>&1
-    Assert ($LASTEXITCODE -eq 0 -and [IO.File]::Exists($profileFile)) "Make Windows default install: $output"
-    foreach ($goal in @('help', 'doctor', 'dotfiles', 'all')) {
-        $output = & $make --no-print-directory -C $fixture $goal 2>&1
-        Assert ($LASTEXITCODE -eq 0) "Make Windows $goal : $output"
-        if ($goal -eq 'doctor') {
-            # PowerShell colours each table column separately on ANSI terminals.
-            $doctorReport = ($output -join "`n") -replace '\x1b\[[0-9;]*m', ''
-            Assert ($doctorReport -match 'Command\s+Required\s+Available\s+WingetId' -and
-                $doctorReport -match 'Microsoft.PowerShell') "Make doctor report missing: $output"
+    # Only the explicit tools target may invoke WinGet. Stub the native process
+    # so this also verifies the complete bundle and failure codes while offline.
+    $stubBin = Join-Path $work 'winget-stub'
+    [void][IO.Directory]::CreateDirectory($stubBin)
+    $oldToolPath = $env:PATH
+    $oldWingetLog = $env:DOTFILES_WINGET_LOG
+    $oldWingetExit = $env:DOTFILES_WINGET_EXIT
+    try {
+        $env:DOTFILES_WINGET_LOG = Join-Path $work 'winget.log'
+        $env:DOTFILES_WINGET_EXIT = '0'
+        if ($IsWindows) {
+            $stubBody = '@echo off', 'echo %*>>"%DOTFILES_WINGET_LOG%"', 'exit /b %DOTFILES_WINGET_EXIT%'
+            [IO.File]::WriteAllText((Join-Path $stubBin 'winget.cmd'), ($stubBody -join "`r`n") + "`r`n")
+        } else {
+            $stub = Join-Path $stubBin 'winget'
+            [IO.File]::WriteAllText($stub, "#!/bin/sh`n" + 'printf "%s\n" "$*" >> "$DOTFILES_WINGET_LOG"' + "`n" + 'exit "$DOTFILES_WINGET_EXIT"' + "`n")
+            [IO.File]::SetUnixFileMode($stub, [IO.UnixFileMode]'UserRead,UserWrite,UserExecute')
         }
+        $env:PATH = $stubBin + [IO.Path]::PathSeparator + $env:PATH
+        $output = & $make --no-print-directory -C $fixture 2>&1
+        Assert ($LASTEXITCODE -eq 0 -and [IO.File]::Exists($profileFile) -and
+            -not [IO.File]::Exists($env:DOTFILES_WINGET_LOG)) "Make Windows default install: $output"
+        foreach ($goal in @('help', 'doctor', 'dotfiles', 'all')) {
+            $output = & $make --no-print-directory -C $fixture $goal 2>&1
+            Assert ($LASTEXITCODE -eq 0 -and -not [IO.File]::Exists($env:DOTFILES_WINGET_LOG)) "Make Windows $goal failed or invoked package installation: $output"
+            if ($goal -eq 'doctor') {
+                # PowerShell colours each table column separately on ANSI terminals.
+                $doctorReport = ($output -join "`n") -replace '\x1b\[[0-9;]*m', ''
+                Assert ($doctorReport -match 'Command\s+Required\s+Available\s+WingetId' -and
+                    $doctorReport -match 'Microsoft.PowerShell') "Make doctor report missing: $output"
+            }
+        }
+        $output = & $make --no-print-directory -C $fixture -n test 2>&1
+        Assert ($LASTEXITCODE -eq 0 -and ($output -join "`n") -like '*make.ps1 -Target test*') 'Windows make test dispatch'
+        if ($IsWindows) {
+            $bundle = @($packages.Packages | Where-Object { -not ($_.ContainsKey('ManualInstall') -and $_.ManualInstall) })
+            $missing = @($bundle | Where-Object { -not (Get-Command $_.Command -CommandType Application -ErrorAction SilentlyContinue) })
+            $output = & $make --no-print-directory -C $fixture tools 2>&1
+            Assert ($LASTEXITCODE -eq 0) "Make tools failed: $output"
+            $calls = [IO.File]::ReadAllLines($env:DOTFILES_WINGET_LOG)
+            $expected = @($bundle | ForEach-Object { "show --exact --id $($_.Id) --source winget --disable-interactivity" }) +
+                @($missing | ForEach-Object { "install --exact --id $($_.Id) --source winget --scope user --disable-interactivity" })
+            Assert (($calls -join "`n") -ceq ($expected -join "`n")) "Tool bundle selection or arguments changed: $calls"
+            Assert (($output -join "`n") -like '*Manual optional setup: Neovim.Neovim*') 'Manual Neovim setup not reported'
+            [IO.File]::Delete($env:DOTFILES_WINGET_LOG)
+            $env:DOTFILES_WINGET_EXIT = '37'
+            $output = & $make --no-print-directory -C $fixture tools 2>&1
+            $calls = [IO.File]::ReadAllLines($env:DOTFILES_WINGET_LOG)
+            Assert ($LASTEXITCODE -ne 0 -and $calls.Count -eq 1 -and $calls[0].StartsWith('show ')) 'WinGet preflight failure was swallowed or allowed installs'
+            Write-Output 'PASS: explicit tool bundle, user scope, existing tools skipped, manual tools reported, WinGet failure propagation'
+        }
+    } finally {
+        $env:PATH = $oldToolPath
+        $env:DOTFILES_WINGET_LOG = $oldWingetLog
+        $env:DOTFILES_WINGET_EXIT = $oldWingetExit
     }
-    $output = & $make --no-print-directory -C $fixture -n test 2>&1
-    Assert ($LASTEXITCODE -eq 0 -and ($output -join "`n") -like '*make.ps1 -Target test*') 'Windows make test dispatch'
     foreach ($goal in @('etc', 'usr', 'check')) {
         $output = & $make --no-print-directory -C $fixture $goal 2>&1
         Assert ($LASTEXITCODE -ne 0) "Legacy Make $goal falsely succeeded"

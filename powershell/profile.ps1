@@ -2,6 +2,7 @@
 # Dot-source from CurrentUserAllHosts. No installs, network, PATH edits or agents.
 if (Get-Module -Name Dotfiles) { return }
 Import-Module -Name (Join-Path $PSScriptRoot 'Dotfiles.psm1') -Global -NoClobber -ErrorAction Stop
+. (Join-Path $PSScriptRoot 'prompt.ps1')
 # Untracked machine customizations run once, after the shared functions.
 $dotfilesLocalProfile = Join-Path (Split-Path -Parent $PROFILE.CurrentUserAllHosts) 'dotfiles.local.ps1'
 if (Test-Path -LiteralPath $dotfilesLocalProfile -PathType Leaf) { . $dotfilesLocalProfile }

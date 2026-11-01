@@ -147,3 +147,12 @@ completion explicitly exits 0 after cleanup, clearing the status left by the
 expected invalid-mode failure. A failing optional Neovim stub still propagates
 failure. The doctor dispatcher explicitly formats and displays the tool report
 before exiting, and the suite asserts that its output contains the report.
+
+The Windows prompt mirrors the Bash two-line colours, path and Git markers.
+It reads porcelain v2 status with optional locks disabled, handles unborn and
+detached branches, and preserves LASTEXITCODE. A local profile can override it.
+The explicit `make tools` target installs the existing reviewed user-scope
+WinGet bundle and reports manual integrations. Offline tests use a WinGet stub
+to assert exact package selection, user scope, failure propagation and the
+absence of package installation from configuration-only targets. Appearance
+settings for Windows Terminal are documented in README for manual application.
