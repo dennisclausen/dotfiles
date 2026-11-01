@@ -5,8 +5,8 @@ The initial maintenance pass remained uncommitted on
 `codex/conservative-maintenance`. At the owner's subsequent request, the
 maintenance files were committed locally and integrated into a new `dev` branch.
 The pre-existing `.bashrc` edits and untracked `ANALYSIS.md` were excluded from
-that commit. Nothing was pushed or published. No packages or plugins were installed or
-upgraded. All 19 baseline tracked files were reviewed, together with the existing
+that commit. That integration did not push or publish changes. No packages or
+plugins were installed or upgraded. All 19 baseline tracked files were reviewed, together with the existing
 untracked audit. The supplied request ends at “Do not use real network requests,”;
 validation uses no network.
 

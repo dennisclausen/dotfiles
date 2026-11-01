@@ -4,6 +4,12 @@ Personal Bash, Git, Readline and Neovim configuration for Linux. The installer
 and tests assume Bash 4+, GNU coreutils and GNU Make. Some retained helpers are
 platform-specific; this is not a portable macOS installer.
 
+## Branches
+
+`dev` is the default branch for development and maintenance. `main` is the
+release branch; promote reviewed changes from `dev` to `main` when preparing a
+release.
+
 ## Installation
 
 Review `install-manifest.sh`, `gitconfig` (including the personal identity), and
