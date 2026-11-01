@@ -1,0 +1,12 @@
+# Keep Bash/Linux entry points usable after a Windows checkout.
+*.sh text eol=lf
+.bash* text eol=lf
+.aliases text eol=lf
+.functions text eol=lf
+.inputrc text eol=lf
+.shellcheckrc text eol=lf
+Makefile text eol=lf
+*.ps1 text eol=lf
+*.psm1 text eol=lf
+*.psd1 text eol=lf
+*.lua text eol=lf

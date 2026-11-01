@@ -1,3 +1,15 @@
+# Native Windows GNU Make uses PowerShell directly, including when bash is on PATH.
+ifeq ($(OS),Windows_NT)
+SHELL := pwsh.exe
+.SHELLFLAGS := -NoLogo -NoProfile -NonInteractive -Command
+.DEFAULT_GOAL := all
+.PHONY: all dotfiles test shellcheck help doctor check etc usr
+all: dotfiles
+all:
+	@Write-Output 'Windows setup complete. Optional tools: pwsh -NoProfile -File ./scripts/windows/dependencies.ps1 -Install'
+dotfiles test shellcheck help doctor check etc usr:
+	@& ./scripts/windows/make.ps1 -Target $@; exit $$LASTEXITCODE
+else
 SHELL := bash
 # Pass HOME via the environment, never interpolate paths into shell code.
 export HOME
@@ -35,3 +47,8 @@ shellcheck: ## Lints the explicit list of Bash sources and scripts.
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_ -]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: doctor
+doctor: ## Reports Linux tools without installing anything.
+	@for tool in bash git make nvim shellcheck eza rg fzf bat btop python3; do command -v "$$tool" || true; done
+endif
